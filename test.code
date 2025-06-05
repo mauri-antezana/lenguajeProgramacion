@@ -1,0 +1,3 @@
+variable x = 10;
+variable y = 5;
+imprimir(x + y);
