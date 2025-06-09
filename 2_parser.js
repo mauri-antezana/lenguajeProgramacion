@@ -37,8 +37,18 @@ export default class Parser {
             return this.parseVariableDeclaration();
         } else if (token === 'imprimir') {
             return this.parsePrintStatement();
+        } else if (token === 'para') {
+            return this.parseForStatement();
+        } else if (token === 'mientras'){
+            return this.parseWhileStatement();
         } else {
-            throw new SyntaxError(`Instruccion desconocida: ${token}`);
+            // Cualquier otra cosa es una expresión (como asignaciones)
+            const expr = this.parseExpression();
+            this.expect(';');
+            return {
+                type: 'ExpressionStatement',
+                expression: expr
+            };
         }
     }
 
@@ -75,10 +85,104 @@ export default class Parser {
         };
     }
 
+    parseForStatement() {
+        this.expect('para');                        // Consume 'para'
+        this.expect('(');                           // Consume '('
+
+        const init = this.parseStatement();         // Parse variable declaration
+
+        const condition = this.parseExpression();   // Parse condition
+        this.expect(';');                           // Consume ';'
+
+        const update = this.parseExpression();    // Parse increment expression
+        this.expect(')');                           // Consume ')'
+
+        const body = this.parseBlock();             // Parse body
+
+        return {
+            type: 'ForStatement',
+            init,
+            condition,
+            update,
+            body
+        };
+    }
+
+    parseWhileStatement() {
+        this.expect('mientras');
+        this.expect('(');
+
+        const condition = this.parseExpression();
+        this.expect(')');
+
+        const body = this.parseBlock();
+        return {
+            type: 'WhileStatement',
+            condition,
+            body
+        };
+    }
+
     parseExpression() {
+        return this.parseAssignment();
+    }
+
+    parseAssignment() {
+        const left = this.parseComparison();
+
+        if (this.current() === '=') {
+            this.next();
+            const right = this.parseAssignment();
+            return {
+                type: 'AssignmentExpression',
+                left,
+                right
+            };
+        }
+
+        return left;
+    }
+
+    parseComparison() {
+        let left = this.parseAddition();
+
+        while (['<', '>', '=='].includes(this.current())) {
+            const operator = this.current();
+            this.next();
+            const right = this.parseAddition();
+            left = {
+                type: 'BinaryExpression',
+                operator,
+                left,
+                right
+            };
+        }
+
+        return left;
+    }
+
+    parseAddition() {
+        let left = this.parseMultiplication();
+
+        while (['+', '-'].includes(this.current())) {
+            const operator = this.current();
+            this.next();
+            const right = this.parseMultiplication();
+            left = {
+                type: 'BinaryExpression',
+                operator,
+                left,
+                right
+            };
+        }
+
+        return left;
+    }
+
+    parseMultiplication() {
         let left = this.parsePrimary();
 
-        while (this.current() === '+' || this.current() === '-' || this.current() === '*' || this.current() === '/') {
+        while (['*', '/'].includes(this.current())) {
             const operator = this.current();
             this.next();
             const right = this.parsePrimary();
@@ -88,25 +192,32 @@ export default class Parser {
                 left,
                 right
             };
-
-            return left;
         }
+
+        return left;
     }
 
     parsePrimary() {
         const token = this.current();
 
-        // Numero
-        if (/^\d+$/.test(token)) {
+        if (token === '(') {
+            this.next();
+            const expr = this.parseExpression();
+            this.expect(')');
+            return expr;
+        }
+
+        // Número
+        if (!isNaN(token)) {
             this.next();
             return {
-                type: 'NumeroLiteral',
+                type: 'Literal',
                 value: Number(token)
             };
         }
 
-        // Identificador 
-        if (/^[a-zA-Z_áéíóúñÁÉÍÓÚÑ]\w*$/.test(token)) {
+        // Variable
+        if (/^[a-zA-Z_]\w*$/.test(token)) {
             this.next();
             return {
                 type: 'Identifier',
@@ -114,6 +225,27 @@ export default class Parser {
             };
         }
 
-        throw new SyntaxError(`Token inesperado en expresion: ${token}`)
+        throw new SyntaxError(`Expresión no válida: '${token}'`);
+    }
+
+    parseBlock() {
+        this.expect('{');
+
+        const body = [];
+
+        while (this.current() !== '}') {
+            if (this.position >= this.tokens.length) {
+                throw new SyntaxError("Bloque sin cerrar: falta '}'");
+            }
+
+            body.push(this.parseStatement());
+        }
+
+        this.expect('}');
+
+        return {
+            type: 'BlockStatement',
+            body
+        };
     }
 }

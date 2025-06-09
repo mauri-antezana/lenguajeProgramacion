@@ -1,3 +1,6 @@
-variable x = 10;
-variable y = 5;
-imprimir(x + y);
+variable x = 0;
+
+para (variable i = 0; i < 5; i = i + 1) {
+    x = x + 1;
+    imprimir(i);
+}
