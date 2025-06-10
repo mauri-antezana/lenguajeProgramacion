@@ -1,6 +1,8 @@
-variable x = 0;
+imprimir("Inicio del bucle:");
 
-para (variable i = 0; i < 5; i = i + 1) {
-    x = x + 1;
+para (i = 0; i < 5; i = i + 1) {
+    imprimir("Iteración número:");
     imprimir(i);
 }
+
+imprimir("Fin del bucle.");

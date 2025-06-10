@@ -41,6 +41,8 @@ export default class Parser {
             return this.parseForStatement();
         } else if (token === 'mientras'){
             return this.parseWhileStatement();
+        } else if (token === 'si') {
+            return this.parseIfStatement(); 
         } else {
             // Cualquier otra cosa es una expresión (como asignaciones)
             const expr = this.parseExpression();
@@ -120,6 +122,29 @@ export default class Parser {
             type: 'WhileStatement',
             condition,
             body
+        };
+    }
+
+    parseIfStatement() {
+        this.expect('si');
+        this.expect('(');
+
+        const condition = this.parseExpression();
+        this.expect(')');
+
+        const consequent = this.parseBlock();
+
+        let alternate = null;
+        if (this.current() === 'sino') {
+            this.next();
+            alternate = this.parseBlock();
+        }
+
+        return {
+            type: 'IfStatement',
+            condition,
+            consequent,
+            alternate
         };
     }
 
@@ -224,6 +249,15 @@ export default class Parser {
                 name: token
             };
         }
+
+        // Cadena
+        if (typeof token === 'object' && token.type === 'string') {
+        this.next();
+        return {
+            type: 'Literal',
+            value: token.value,
+        };
+    }
 
         throw new SyntaxError(`Expresión no válida: '${token}'`);
     }
