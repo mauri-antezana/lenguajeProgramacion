@@ -1,8 +1,6 @@
-imprimir("Inicio del bucle:");
-
-para (i = 0; i < 5; i = i + 1) {
-    imprimir("Iteración número:");
-    imprimir(i);
+funcion saludar(nombre) {
+    imprimir("Hola");
+    imprimir(nombre);
 }
 
-imprimir("Fin del bucle.");
+saludar("Carlos");

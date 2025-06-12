@@ -43,6 +43,8 @@ export default class Parser {
             return this.parseWhileStatement();
         } else if (token === 'si') {
             return this.parseIfStatement(); 
+        } else if (token === 'funcion') {
+            return this.parseFunctionDeclaration(); 
         } else {
             // Cualquier otra cosa es una expresión (como asignaciones)
             const expr = this.parseExpression();
@@ -148,6 +150,36 @@ export default class Parser {
         };
     }
 
+    parseFunctionDeclaration() {
+        this.expect('funcion');
+
+        const name = this.current();
+        this.next();
+
+        this.expect('(');
+        const params = [];
+
+        while (this.current() !== ')') {
+            params.push(this.current());
+            this.next();
+
+            if (this.current() === ',') {
+                this.next(); // omitir coma
+            }
+        }
+
+        this.expect(')');
+
+        const body = this.parseBlock();
+
+        return {
+            type: 'FunctionDeclaration',
+            name,
+            params,
+            body,
+        };
+    }
+
     parseExpression() {
         return this.parseAssignment();
     }
@@ -241,26 +273,49 @@ export default class Parser {
             };
         }
 
-        // Variable
-        if (/^[a-zA-Z_]\w*$/.test(token)) {
+        // Cadena (si estás manejando strings como objetos tokenizados)
+        if (typeof token === 'object' && token.type === 'string') {
             this.next();
             return {
-                type: 'Identifier',
-                name: token
+                type: 'Literal',
+                value: token.value,
             };
         }
 
-        // Cadena
-        if (typeof token === 'object' && token.type === 'string') {
-        this.next();
-        return {
-            type: 'Literal',
-            value: token.value,
-        };
-    }
+        // Identificador (variable o función)
+        if (/^[a-zA-Z_]\w*$/.test(token)) {
+            const name = token;
+            this.next();
+
+            // 👉 Si después del identificador viene '(', es una función
+            if (this.current() === '(') {
+                this.next(); // '('
+                const args = [];
+
+                if (this.current() !== ')') {
+                    do {
+                        args.push(this.parseExpression());
+                    } while (this.current() === ',' && this.next());
+                }
+
+                this.expect(')');
+                return {
+                    type: 'FunctionCall',
+                    name,
+                    args
+                };
+            }
+
+            // Si no hay paréntesis, es una variable
+            return {
+                type: 'Identifier',
+                name
+            };
+        }
 
         throw new SyntaxError(`Expresión no válida: '${token}'`);
     }
+
 
     parseBlock() {
         this.expect('{');

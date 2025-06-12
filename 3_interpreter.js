@@ -1,6 +1,7 @@
 export default class Interpreter {
     constructor() {
         this.environment = {};
+        this.functions = {};
     }
 
     run(program) {
@@ -23,6 +24,8 @@ export default class Interpreter {
                 return this.evaluate(node.expression);
             case 'BlockStatement':
                 return this.executeBlock(node.body);
+            case 'FunctionDeclaration':
+                return this.executeFunctionDeclaration(node);
             default:
                 throw new Error(`Tipo de instrucción no soportado: ${node.type}`);
         }
@@ -34,7 +37,12 @@ export default class Interpreter {
         }
     }
 
-
+    executeFunctionDeclaration(node) {
+        this.functions[node.name] = {
+            params: node.params,
+            body: node.body
+        };
+    }
 
     evaluate(node) {
         switch (node.type) {
@@ -46,6 +54,8 @@ export default class Interpreter {
                 return this.environment[node.name];
             case 'Literal':
                 return node.value;
+            case 'FunctionCall':
+                return this.evaluateFunctionCall(node);
             default:
                 throw new Error(`Expresión no soportada: ${node.type}`);
         }
@@ -100,6 +110,30 @@ export default class Interpreter {
     executePrint(node) {
         const value = this.evaluate(node.expression);
         console.log(value);
+    }
+
+    evaluateFunctionCall(node) {
+        const func = this.functions[node.name];
+
+        if (!func) {
+            throw new Error(`Función no definida: ${node.name}`);
+        }
+
+        // Guardar el entorno actual
+        const previousEnv = { ...this.environment };
+
+        // Evaluar argumentos y asignarlos a los parámetros de la función
+        node.args.forEach((arg, index) => {
+            const paramName = func.params[index];
+            const argValue = this.evaluate(arg);
+            this.environment[paramName] = argValue;
+        });
+
+        // Ejecutar el cuerpo de la función
+        this.execute(func.body);
+
+        // Restaurar el entorno anterior
+        this.environment = previousEnv;
     }
 
 }

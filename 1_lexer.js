@@ -1,4 +1,4 @@
-const keywords = ['si', 'sino', 'mientras', 'para', 'imprimir'];
+const keywords = ['si', 'sino', 'mientras', 'para', 'imprimir', 'funcion', 'retornar'];
 
 function tokenize(code) {
     const tokens = [];
