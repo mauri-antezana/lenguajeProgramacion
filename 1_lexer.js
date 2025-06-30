@@ -1,4 +1,4 @@
-const keywords = ['si', 'sino', 'mientras', 'para', 'imprimir', 'funcion', 'retornar'];
+const keywords = ['si', 'sino', 'mientras', 'para', 'imprimir', 'funcion', 'retornar','variable'];
 
 function tokenize(code) {
     const tokens = [];
@@ -8,25 +8,20 @@ function tokenize(code) {
     while ((match = regex.exec(code)) !== null) {
         const token = match[1];
 
-        // String literal
         if (token.startsWith('"') && token.endsWith('"')) {
-            const value = token.slice(1, -1); // quitar comillas
-            tokens.push({ type: 'string', value });
+            tokens.push({ type: 'string', value: token.slice(1, -1) });
         }
-
-        // Keyword
         else if (keywords.includes(token)) {
-            tokens.push(token);
+            tokens.push({ type: 'keyword', value: token });
         }
-
-        // Número
         else if (!isNaN(token)) {
-            tokens.push(token);
+            tokens.push({ type: 'number', value: Number(token) });
         }
-
-        // Identificador u operador
+        else if (/^[a-zA-Z_]\w*$/.test(token)) {
+            tokens.push({ type: 'identifier', value: token });
+        }
         else {
-            tokens.push(token);
+            tokens.push({ type: 'symbol', value: token }); // operadores y puntuación
         }
     }
 

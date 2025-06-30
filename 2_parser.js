@@ -12,11 +12,31 @@ export default class Parser {
         this.position++;
     }
 
-    expect(value) {
-        if (this.current() == value) {
+    expectSymbol(value) {
+        const token = this.current();
+        if (token?.type === 'symbol' && token.value === value) {
             this.next();
         } else {
-            throw new SyntaxError(`Se esperaba '${value}', pero se encontro '${this.current()}'`);
+            throw new SyntaxError(`Se esperaba símbolo '${value}', pero se encontró '${token?.value}'`);
+        }
+    }
+
+    expectKeyword(value) {
+        const token = this.current();
+        if (token?.type === 'keyword' && token.value === value) {
+            this.next();
+        } else {
+            throw new SyntaxError(`Se esperaba palabra clave '${value}', pero se encontró '${token?.value}'`);
+        }
+    }
+
+    expectIdentifier() {
+        const token = this.current();
+        if (token?.type === 'identifier') {
+            this.next();
+            return token.value;
+        } else {
+            throw new SyntaxError(`Se esperaba un identificador, pero se encontró '${token?.value}'`);
         }
     }
 
@@ -33,22 +53,30 @@ export default class Parser {
     parseStatement() {
         const token = this.current();
 
-        if (token === 'variable') {
-            return this.parseVariableDeclaration();
-        } else if (token === 'imprimir') {
-            return this.parsePrintStatement();
-        } else if (token === 'para') {
-            return this.parseForStatement();
-        } else if (token === 'mientras'){
-            return this.parseWhileStatement();
-        } else if (token === 'si') {
-            return this.parseIfStatement(); 
-        } else if (token === 'funcion') {
-            return this.parseFunctionDeclaration(); 
+        if (token.type === 'keyword') {
+            switch (token.value) {
+                case 'variable':
+                    return this.parseVariableDeclaration();
+                case 'imprimir':
+                    return this.parsePrintStatement();
+                case 'para':
+                    return this.parseForStatement();
+                case 'mientras':
+                    return this.parseWhileStatement();
+                case 'si':
+                    return this.parseIfStatement();
+                case 'funcion':
+                    return this.parseFunctionDeclaration();
+                case 'retornar':
+                    return this.parseReturnStatement();
+                default:
+                    // Si es una palabra reservada no reconocida, lanzar error o tratar como expresión
+                    throw new SyntaxError(`Palabra reservada no soportada: ${token.value}`);
+            }
         } else {
-            // Cualquier otra cosa es una expresión (como asignaciones)
+            // Si no es keyword, asumimos expresión
             const expr = this.parseExpression();
-            this.expect(';');
+            this.expectSymbol(';');
             return {
                 type: 'ExpressionStatement',
                 expression: expr
@@ -56,16 +84,17 @@ export default class Parser {
         }
     }
 
+
     parseVariableDeclaration() {
-        this.expect('variable');        // Consume 'variable'
-        const name = this.current();    // Nombre de la variable
+        this.expectKeyword('variable');        // Consume 'variable'
+        const name = this.current().value;    // Nombre de la variable
         this.next();
 
-        this.expect('=');               // Consume '='
-        
+        this.expectSymbol('=');               // Consume '='
+
         const value = this.parseExpression();
 
-        this.expect(';');               // Consume ';'
+        this.expectSymbol(';');               // Consume ';'
 
         return { 
             type: 'VariableDeclaration', 
@@ -75,13 +104,13 @@ export default class Parser {
     }
 
     parsePrintStatement() {
-        this.expect('imprimir');        // Consume 'imprimir'
-        this.expect('(');               // Consume '('
-        
+        this.expectKeyword('imprimir');        // Consume 'imprimir'
+        this.expectSymbol('(');               // Consume '('
+
         const expression = this.parseExpression();
 
-        this.expect(')');               // Consume ')'
-        this.expect(';');               // Consume ';'
+        this.expectSymbol(')');               // Consume ')'
+        this.expectSymbol(';');               // Consume ';'
 
         return { 
             type: 'PrintStatement', 
@@ -90,16 +119,16 @@ export default class Parser {
     }
 
     parseForStatement() {
-        this.expect('para');                        // Consume 'para'
-        this.expect('(');                           // Consume '('
+        this.expectKeyword('para');                        // Consume 'para'
+        this.expectSymbol('(');                           // Consume '('
 
         const init = this.parseStatement();         // Parse variable declaration
 
         const condition = this.parseExpression();   // Parse condition
-        this.expect(';');                           // Consume ';'
+        this.expectSymbol(';');                           // Consume ';'
 
         const update = this.parseExpression();    // Parse increment expression
-        this.expect(')');                           // Consume ')'
+        this.expectSymbol(')');                           // Consume ')'
 
         const body = this.parseBlock();             // Parse body
 
@@ -113,11 +142,11 @@ export default class Parser {
     }
 
     parseWhileStatement() {
-        this.expect('mientras');
-        this.expect('(');
+        this.expectKeyword('mientras');
+        this.expectSymbol('(');
 
         const condition = this.parseExpression();
-        this.expect(')');
+        this.expectSymbol(')');
 
         const body = this.parseBlock();
         return {
@@ -128,16 +157,16 @@ export default class Parser {
     }
 
     parseIfStatement() {
-        this.expect('si');
-        this.expect('(');
+        this.expectKeyword('si');
+        this.expectSymbol('(');
 
         const condition = this.parseExpression();
-        this.expect(')');
+        this.expectSymbol(')');
 
         const consequent = this.parseBlock();
 
         let alternate = null;
-        if (this.current() === 'sino') {
+        if (this.current().value === 'sino') {
             this.next();
             alternate = this.parseBlock();
         }
@@ -150,25 +179,37 @@ export default class Parser {
         };
     }
 
-    parseFunctionDeclaration() {
-        this.expect('funcion');
+    parseReturnStatement() {
+        this.expectKeyword('retornar');
 
-        const name = this.current();
+        const expression = this.parseExpression();
+        this.expectSymbol(';');
+
+        return {
+            type: 'ReturnStatement',
+            expression
+        };
+    }
+    
+    parseFunctionDeclaration() {
+        this.expectKeyword('funcion');
+
+        const name = this.current().value;
         this.next();
 
-        this.expect('(');
+        this.expectSymbol('(');
         const params = [];
 
-        while (this.current() !== ')') {
-            params.push(this.current());
+        while (this.current().value !== ')') {
+            params.push(this.current().value);
             this.next();
 
-            if (this.current() === ',') {
+            if (this.current().value === ',') {
                 this.next(); // omitir coma
             }
         }
 
-        this.expect(')');
+        this.expectSymbol(')');
 
         const body = this.parseBlock();
 
@@ -187,7 +228,7 @@ export default class Parser {
     parseAssignment() {
         const left = this.parseComparison();
 
-        if (this.current() === '=') {
+        if (this.current().value === '=') {
             this.next();
             const right = this.parseAssignment();
             return {
@@ -203,8 +244,11 @@ export default class Parser {
     parseComparison() {
         let left = this.parseAddition();
 
-        while (['<', '>', '=='].includes(this.current())) {
-            const operator = this.current();
+        while (
+            this.current()?.type === 'symbol' &&
+            ['<', '>', '=='].includes(this.current().value)
+        ) {
+            const operator = this.current().value;
             this.next();
             const right = this.parseAddition();
             left = {
@@ -221,8 +265,11 @@ export default class Parser {
     parseAddition() {
         let left = this.parseMultiplication();
 
-        while (['+', '-'].includes(this.current())) {
-            const operator = this.current();
+        while (
+            this.current()?.type === 'symbol' &&
+            ['+', '-'].includes(this.current().value)
+        ) {
+            const operator = this.current().value;
             this.next();
             const right = this.parseMultiplication();
             left = {
@@ -239,8 +286,11 @@ export default class Parser {
     parseMultiplication() {
         let left = this.parsePrimary();
 
-        while (['*', '/'].includes(this.current())) {
-            const operator = this.current();
+        while (
+            this.current()?.type === 'symbol' &&
+            ['*', '/'].includes(this.current().value)
+        ) {
+            const operator = this.current().value;
             this.next();
             const right = this.parsePrimary();
             left = {
@@ -257,48 +307,58 @@ export default class Parser {
     parsePrimary() {
         const token = this.current();
 
-        if (token === '(') {
+        if (!token) {
+            throw new SyntaxError("Fin inesperado de entrada");
+        }
+
+        // Paréntesis: expresión agrupada
+        if (token.type === 'symbol' && token.value === '(') {
             this.next();
             const expr = this.parseExpression();
-            this.expect(')');
+            this.expectSymbol(')');
             return expr;
         }
 
-        // Número
-        if (!isNaN(token)) {
+        // Literal numérico
+        if (token.type === 'number') {
             this.next();
             return {
                 type: 'Literal',
-                value: Number(token)
+                value: token.value
             };
         }
 
-        // Cadena (si estás manejando strings como objetos tokenizados)
-        if (typeof token === 'object' && token.type === 'string') {
+        // Literal string
+        if (token.type === 'string') {
             this.next();
             return {
                 type: 'Literal',
-                value: token.value,
+                value: token.value
             };
         }
 
-        // Identificador (variable o función)
-        if (/^[a-zA-Z_]\w*$/.test(token)) {
-            const name = token;
+        // Identificador (variable o llamada a función)
+        if (token.type === 'identifier') {
+            const name = token.value;
             this.next();
 
-            // 👉 Si después del identificador viene '(', es una función
-            if (this.current() === '(') {
-                this.next(); // '('
+            // Llamada a función
+            if (this.current()?.type === 'symbol' && this.current().value === '(') {
+                this.next(); // consumir '('
                 const args = [];
 
-                if (this.current() !== ')') {
-                    do {
-                        args.push(this.parseExpression());
-                    } while (this.current() === ',' && this.next());
+                while (this.current()?.type !== 'symbol' || this.current()?.value !== ')') {
+                    args.push(this.parseExpression());
+
+                    if (this.current()?.type === 'symbol' && this.current().value === ',') {
+                        this.next(); // omitir coma
+                    } else {
+                        break;
+                    }
                 }
 
-                this.expect(')');
+                this.expectSymbol(')');
+
                 return {
                     type: 'FunctionCall',
                     name,
@@ -306,23 +366,22 @@ export default class Parser {
                 };
             }
 
-            // Si no hay paréntesis, es una variable
+            // Variable
             return {
                 type: 'Identifier',
                 name
             };
         }
 
-        throw new SyntaxError(`Expresión no válida: '${token}'`);
+        throw new SyntaxError(`Expresión no válida: '${token?.value}'`);
     }
 
-
     parseBlock() {
-        this.expect('{');
+        this.expectSymbol('{');
 
         const body = [];
 
-        while (this.current() !== '}') {
+        while (this.current().value !== '}') {
             if (this.position >= this.tokens.length) {
                 throw new SyntaxError("Bloque sin cerrar: falta '}'");
             }
@@ -330,7 +389,7 @@ export default class Parser {
             body.push(this.parseStatement());
         }
 
-        this.expect('}');
+        this.expectSymbol('}');
 
         return {
             type: 'BlockStatement',

@@ -1,6 +1,37 @@
-funcion saludar(nombre) {
-    imprimir("Hola");
-    imprimir(nombre);
+variable x = 10;
+variable y = 20;
+
+variable resultado = x + y * 2;
+
+imprimir("El resultado es:");
+imprimir(resultado);
+
+si (resultado > 30) {
+    imprimir("Mayor a 30");
+} sino {
+    imprimir("Menor o igual a 30");
 }
 
-saludar("Carlos");
+imprimir("Ciclo mientras");
+variable contador = 0;
+mientras (contador < 5) {
+    imprimir(contador);
+    contador = contador + 1;
+}
+
+imprimir("Ciclo para");
+para (variable i = 0; i < 3; i = i + 1) {
+    imprimir(i);
+}
+
+imprimir("Declaracion de funcion");
+funcion saludar(nombre) {
+    imprimir("Hola, " + nombre);
+}
+
+saludar("Mauricio");
+
+imprimir("Funcion con retornar");
+funcion sumar(a, b) {
+    retornar a + b;
+}

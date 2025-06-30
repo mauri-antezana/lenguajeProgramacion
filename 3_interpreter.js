@@ -1,12 +1,34 @@
 export default class Interpreter {
     constructor() {
-        this.environment = {};
+        this.globalEnv = {};
+        this.envStack = [this.globalEnv];
         this.functions = {};
     }
 
+    get environment() {
+        return this.envStack[this.envStack.length - 1];
+    }
+
+    pushEnv() {
+        this.envStack.push({});
+    }
+
+    popEnv() {
+        this.envStack.pop();
+    }
+
+
     run(program) {
+        if (!program || !Symbol.iterator in Object(program)) {
+            throw new Error("Programa inválido para ejecutar");
+        }
+
         for (const statement of program) {
-            this.execute(statement);
+            const result = this.execute(statement);
+            // Si la ejecución devuelve un objeto tipo 'Return', propagamos
+            if (result && result.type === 'Return') {
+                return result.value;
+            }
         }
     }
 
@@ -26,18 +48,28 @@ export default class Interpreter {
                 return this.executeBlock(node.body);
             case 'FunctionDeclaration':
                 return this.executeFunctionDeclaration(node);
+            case 'VariableDeclaration':
+                return this.evaluateVariableDeclaration(node);
+            case 'ReturnStatement':
+                return this.executeReturn(node);
             default:
                 throw new Error(`Tipo de instrucción no soportado: ${node.type}`);
         }
     }
 
+
     executeBlock(statements) {
         for (const stmt of statements) {
-            this.execute(stmt);
+            const result = this.execute(stmt);
+            
+            if (result && result.type === 'Return') {
+                return result;
+            }
         }
     }
 
     executeFunctionDeclaration(node) {
+        // Suponiendo que node.name es string, si es token usa node.name.value
         this.functions[node.name] = {
             params: node.params,
             body: node.body
@@ -51,6 +83,9 @@ export default class Interpreter {
             case 'AssignmentExpression':
                 return this.evaluateAssignment(node);
             case 'Identifier':
+                if (!(node.name in this.environment)) {
+                    throw new Error(`Variable no definida: ${node.name}`);
+                }
                 return this.environment[node.name];
             case 'Literal':
                 return node.value;
@@ -60,6 +95,7 @@ export default class Interpreter {
                 throw new Error(`Expresión no soportada: ${node.type}`);
         }
     }
+
 
     evaluateBinary(node) {
         const left = this.evaluate(node.left);
@@ -80,29 +116,50 @@ export default class Interpreter {
 
     evaluateAssignment(node) {
         const value = this.evaluate(node.right);
+
+        if (!node.left || !node.left.name) {
+            throw new Error('Lado izquierdo de asignación inválido');
+        }
+
+        // Puedes agregar validación aquí si quieres que solo asigne variables ya declaradas
         this.environment[node.left.name] = value;
+
         return value;
     }
 
     executeIf(node) {
         const condition = this.evaluate(node.condition);
+
         if (condition) {
-            this.execute(node.consequent);
+            const result = this.execute(node.consequent);
+            // Propagar retorno si existe (para manejar ReturnStatement)
+            if (result && result.type === 'Return') {
+                return result;
+            }
         } else if (node.alternate) {
-            this.execute(node.alternate);
+            const result = this.execute(node.alternate);
+            if (result && result.type === 'Return') {
+                return result;
+            }
         }
     }
 
     executeWhile(node) {
         while (this.evaluate(node.condition)) {
-            this.execute(node.body);
+            const result = this.execute(node.body);
+            if (result && result.type === 'Return') {
+                return result;  // Propagar retorno para salir del ciclo y función
+            }
         }
     }
 
     executeFor(node) {
         this.execute(node.init);
         while (this.evaluate(node.condition)) {
-            this.execute(node.body);
+            const result = this.execute(node.body);
+            if (result && result.type === 'Return') {
+                return result;  // Propagar retorno para salir del ciclo y función
+            }
             this.evaluate(node.update);
         }
     }
@@ -112,28 +169,41 @@ export default class Interpreter {
         console.log(value);
     }
 
+    executeReturn(node) {
+        const value = this.evaluate(node.expression);
+        return { type: 'Return', value };
+    }
+
+    evaluateVariableDeclaration(node) {
+        if (!node.name || !node.value) {
+            throw new Error('Declaración de variable inválida');
+        }
+        const value = this.evaluate(node.value);
+        this.environment[node.name] = value;
+        return value;
+    }
+
+
     evaluateFunctionCall(node) {
         const func = this.functions[node.name];
-
         if (!func) {
             throw new Error(`Función no definida: ${node.name}`);
         }
 
-        // Guardar el entorno actual
-        const previousEnv = { ...this.environment };
+        this.pushEnv();
 
-        // Evaluar argumentos y asignarlos a los parámetros de la función
-        node.args.forEach((arg, index) => {
-            const paramName = func.params[index];
-            const argValue = this.evaluate(arg);
-            this.environment[paramName] = argValue;
+        
+        node.args.forEach((arg, i) => {
+            const paramName = func.params[i];
+            this.environment[paramName] = this.evaluate(arg);
         });
+        
+        const result = this.execute(func.body);
 
-        // Ejecutar el cuerpo de la función
-        this.execute(func.body);
+        this.popEnv();
 
-        // Restaurar el entorno anterior
-        this.environment = previousEnv;
+        return result && result.type === 'Return' ? result.value : undefined;
     }
+
 
 }
